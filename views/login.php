@@ -1,7 +1,28 @@
 <?php
 include 'common.php';
 if ($user->hasLogin()) {
-    $response->redirect($options->adminUrl);
+    // 兼容不同版本的重定向
+    if (class_exists('Typecho\Response')) {
+        // Typecho 1.2+ 版本使用单例模式
+        try {
+            $response = \Typecho\Response::getInstance();
+            if (method_exists($response, 'redirect')) {
+                $response->redirect($options->adminUrl);
+            } else {
+                // 如果redirect方法不存在，使用替代方法
+                $response->setStatus(302)
+                    ->setHeader('Location', $options->adminUrl)
+                    ->respond();
+            }
+        } catch (Exception $e) {
+            // 出现异常时使用替代方法
+            header('Location: ' . $options->adminUrl);
+            exit;
+        }
+    } else {
+        // 旧版本 Typecho
+        $response->redirect($options->adminUrl);
+    }
 }
 $option = XGLogin_Plugin::getoptions();
 $rememberName = htmlspecialchars(Typecho_Cookie::get('__typecho_remember_name'));
