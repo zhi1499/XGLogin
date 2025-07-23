@@ -12,18 +12,15 @@
 
 ----------
 
+  
+在原作者的基础上我进行了以下优化：
+1.XGLogin 插件可以独立运行，不依赖于 XGAdmin 插件的存在
+2.适配typecho1.2最新版本
 
-## 效果图
-### 登录注册界面
-![62227-pqwz5husmx.png](https://www.xggm.top/usr/uploads/2022/08/1723855020.png)
+----------
+感谢原作者！
+## 作者信息
 
-![62789-7e7lpnzeqk4.png](https://www.xggm.top/usr/uploads/2022/08/3748085688.png)
-
-![00966-c22gdg5vfpb.png](https://www.xggm.top/usr/uploads/2022/08/640484962.png)
-
-### 插件后台设置
-
-![43248-pmtbeqr2tcc.png](https://www.xggm.top/usr/uploads/2022/08/3168733205.png)
-
-####美化插件设置
-![11279-t9nqjpvduxe.png](https://www.xggm.top/usr/uploads/2022/08/1830078258.png)
+- 作者：XG
+- 网站：[https://xggm.top](https://xggm.top)
+- 联系方式：请访问作者网站获取最新联系方式
