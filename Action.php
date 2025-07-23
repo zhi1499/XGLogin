@@ -85,8 +85,17 @@ class XGLogin_Action extends Typecho_Widget
             $authCode         = function_exists('openssl_random_pseudo_bytes') ? bin2hex(openssl_random_pseudo_bytes(16)) : sha1(Typecho_Common::randString(20));
             $user['authCode'] = $authCode;
 
-            Typecho_Cookie::set('__typecho_uid', $user['uid'], $expire);
-            Typecho_Cookie::set('__typecho_authCode', Typecho_Common::hash($authCode), $expire);
+            // 设置 cookie 过期时间为 30 天
+            $expire = 30 * 24 * 3600;
+            
+            // 兼容不同版本的 Cookie 设置
+            if (class_exists('Typecho\Cookie')) {
+                \Typecho\Cookie::set('__typecho_uid', $user['uid'], $expire);
+                \Typecho\Cookie::set('__typecho_authCode', \Typecho\Common::hash($authCode), $expire);
+            } else {
+                Typecho_Cookie::set('__typecho_uid', $user['uid'], $expire);
+                Typecho_Cookie::set('__typecho_authCode', Typecho_Common::hash($authCode), $expire);
+            }
 
             //更新最后登录时间以及验证码
             $db->query($db->update('table.users')->expression('logged',
@@ -97,16 +106,31 @@ class XGLogin_Action extends Typecho_Widget
             $this->_user     = $user;
             $this->_hasLogin = true;
 
-            echo 'success';
-        }
-        
-        // 兼容不同版本的重定向
-        if (class_exists('Typecho\Response')) {
-            $response = new \Typecho\Response();
-            $response->redirect(Helper::options()->adminUrl);
+            // 兼容不同版本的重定向
+            if (class_exists('Typecho\Response')) {
+                // Typecho 1.2+ 版本使用单例模式
+                try {
+                    $response = \Typecho\Response::getInstance();
+                    if (method_exists($response, 'redirect')) {
+                        $response->redirect(Helper::options()->adminUrl);
+                    } else {
+                        // 如果redirect方法不存在，使用替代方法
+                        $response->setStatus(302)
+                            ->setHeader('Location', Helper::options()->adminUrl)
+                            ->respond();
+                    }
+                } catch (Exception $e) {
+                    // 出现异常时使用替代方法
+                    header('Location: ' . Helper::options()->adminUrl);
+                    exit;
+                }
+            } else {
+                // 旧版本 Typecho
+                $response = new Typecho_Response();
+                $response->redirect(Helper::options()->adminUrl);
+            }
         } else {
-            $response = new Typecho_Response();
-            $response->redirect(Helper::options()->adminUrl);
+            echo 'login failed';
         }
     }
 
@@ -142,26 +166,47 @@ class XGLogin_Action extends Typecho_Widget
         if ($qrsig) {
             $api             = 'https://ssl.ptlogin2.qq.com/ptqrlogin?u1=https://qzs.qq.com/qzone/v5/loginsucc.html&ptqrtoken=' . self::getqrtoken($qrsig) . '&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&action=0-2-' . time() . '&js_ver=22052613&js_type=1&login_sig=&pt_uistyle=40&aid=549000912&daid=5&ptdrvs=&sid=&&o1vId=';
             $paras['cookie'] = 'qrsig=' . $qrsig . ';';
-            $body            = self::get_curl($api, $paras);
-            if (preg_match("/ptuiCB\('(.*?)'\)/", $body, $arr)) {
-                $r = explode("','", str_replace("', '", "','", $arr[1]));
-                if ($r[0] == 0) {
-                    preg_match('/uin=(\d+)&/', $body, $uin);
-                    $ret['code']         = 200;
-                    $ret['data']['uin']  = $uin[1];
-                    $ret['data']['type'] = 'qq';
-                    $ret['msg']          = 'QQ登录成功';
-                } elseif ($r[0] == 65) {
-                    $ret['msg'] = '登录二维码已失效，请刷新重试！';
-                } elseif ($r[0] == 66) {
-                    $ret['msg'] = '请使用手机QQ扫码登录';
-                } elseif ($r[0] == 67) {
-                    $ret['msg'] = '正在验证二维码...';
-                } else {
-                    $ret['msg'] = '未知错误001，请刷新重试！';
-                }
+            $body = self::get_curl($api, $paras);
+            
+            // 处理错误情况
+            if ($body === false) {
+                $ret['code'] = 0;
+                $ret['msg'] = 'QQ登录API请求失败';
+                $ret['debug'] = array(
+                    'api_url' => $api,
+                    'params' => $paras,
+                    'error' => 'CURL请求失败'
+                );
+                $this->responseJson($ret);
+                return;
+            }
+            
+            if (!preg_match("/ptuiCB\('(.*?)'\)/", $body, $arr)) {
+                $ret['code'] = 0;
+                $ret['msg'] = 'API响应格式不正确';
+                $ret['debug'] = array(
+                    'api_url' => $api,
+                    'response' => $body
+                );
+                $this->responseJson($ret);
+                return;
+            }
+            
+            $r = explode("','", str_replace("', '", "','", $arr[1]));
+            if ($r[0] == 0) {
+                preg_match('/uin=(\d+)&/', $body, $uin);
+                $ret['code']         = 200;
+                $ret['data']['uin']  = $uin[1];
+                $ret['data']['type'] = 'qq';
+                $ret['msg']          = 'QQ登录成功';
+            } elseif ($r[0] == 65) {
+                $ret['msg'] = '登录二维码已失效，请刷新重试！';
+            } elseif ($r[0] == 66) {
+                $ret['msg'] = '请使用手机QQ扫码登录';
+            } elseif ($r[0] == 67) {
+                $ret['msg'] = '正在验证二维码...';
             } else {
-                $ret['msg'] = '登录结果获取失败';
+                $ret['msg'] = '未知错误001，请刷新重试！';
             }
         } else {
             $ret['msg'] = '请求参数错误，请刷新重试！~~';
