@@ -6,17 +6,36 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 
 class XGLogin_Action extends Typecho_Widget
 {
+    // 添加兼容性方法
+    private function responseJson($data)
+    {
+        if (class_exists('Typecho\Response')) {
+            // 新版本 Typecho 1.2
+            \Typecho\Response::getInstance()->setStatus(200)
+                ->setContentType('application/json')
+                ->addResponder(function() use ($data) {
+                    echo json_encode($data);
+                })
+                ->respond();
+        } else {
+            // 旧版本 Typecho
+            $response = new Typecho_Response();
+            $response->throwJson($data);
+        }
+    }
 
     /* 重置当前用户绑定数据 */
     public function reset()
     {
         require_once __TYPECHO_ROOT_DIR__ . __TYPECHO_ADMIN_DIR__ . 'common.php';
-        $res = new Typecho_Response();
         $ret = [];
-
-        if ($user->haslogin()) {
+        
+        // 获取当前用户
+        $user = Typecho_Widget::widget('Widget_User');
+        
+        if ($user->hasLogin()) {
             // 获取当前用户名
-            $name = $user->__get('name');
+            $name = $user->name;
 
             // 获取插件配置
             $options = XGLogin_Plugin::getoptions();
@@ -34,14 +53,13 @@ class XGLogin_Action extends Typecho_Widget
         } else {
             $ret['msg'] = 'what are you doing?';
         }
-        $res->throwJson($ret);
+        $this->responseJson($ret);
     }
 
     /* 跳转验证登录 */
     public function login()
     {
         $req   = new Typecho_Request();
-        $res   = new Typecho_Response();
         $token = base64_decode(urldecode($req->get('token')));
 
         // 获取插件配置
@@ -81,7 +99,15 @@ class XGLogin_Action extends Typecho_Widget
 
             echo 'success';
         }
-        $res->redirect(Helper::options()->adminUrl);
+        
+        // 兼容不同版本的重定向
+        if (class_exists('Typecho\Response')) {
+            $response = new \Typecho\Response();
+            $response->redirect(Helper::options()->adminUrl);
+        } else {
+            $response = new Typecho_Response();
+            $response->redirect(Helper::options()->adminUrl);
+        }
     }
 
     /* 二维码授权绑定 */
@@ -94,7 +120,6 @@ class XGLogin_Action extends Typecho_Widget
     /* 获取登录二维码 */
     public function getqrcode()
     {
-        $res    = new Typecho_Response();
         $req    = new Typecho_Request();
         $qrcode = [];
         $api             = 'https://ssl.ptlogin2.qq.com/ptqrshow?appid=549000912&e=2&l=M&s=3&d=72&v=4&t=0.60651792' . time() . '&daid=5&pt_3rd_aid=0';
@@ -104,13 +129,12 @@ class XGLogin_Action extends Typecho_Widget
         $arr             = explode("\r\n\r\n", $resp);
         $qrcode['qrsig'] = $matches[1];
         $qrcode['data']  = base64_encode(trim($arr['1']));
-        $res->throwJson($qrcode);
+        $this->responseJson($qrcode);
     }
 
     /* 获取登录结果 */
     public function getresult()
     {
-        $res   = new Typecho_Response();
         $req   = new Typecho_Request();
         $ret   = [];
         $qrsig = $req->get('qrsig');
@@ -176,20 +200,22 @@ class XGLogin_Action extends Typecho_Widget
                 }
             }
         }
-        $res->throwJson($ret);
+        $this->responseJson($ret);
     }
 
     /* 绑定授权信息 */
     public function bind()
     {
         require_once __TYPECHO_ROOT_DIR__ . __TYPECHO_ADMIN_DIR__ . 'common.php';
-        $res = new Typecho_Response();
         $req = new Typecho_Request();
         $ret = [];
-
-        if ($user->haslogin()) {
+        
+        // 获取当前用户
+        $user = Typecho_Widget::widget('Widget_User');
+        
+        if ($user->hasLogin()) {
             // 获取当前用户名
-            $name = $user->__get('name');
+            $name = $user->name;
 
             // 获取插件配置
             $options = XGLogin_Plugin::getoptions();
@@ -207,8 +233,8 @@ class XGLogin_Action extends Typecho_Widget
             foreach ($data as $name_ => $arr) {
                 if ($arr[$type] == $uin && $name_ != $name) {
                     $ret['code'] = 201;
-                    $ret['msg']  = ($type == 'QQ') . '已绑定另一账户，绑定失败';
-                    $res->throwJson($ret);
+                    $ret['msg']  = $type . '已绑定另一账户，绑定失败';
+                    $this->responseJson($ret);
                     break;
                 }
             }
@@ -216,11 +242,11 @@ class XGLogin_Action extends Typecho_Widget
             $data[$name][$type] = $uin;
             @file_put_contents($filepath, XGLogin_Plugin::authcode(serialize($data), 'ENCODE', $key));
             $ret['code'] = 200;
-            $ret['msg']  = ($type == 'QQ') . '登录绑定成功';
+            $ret['msg']  = $type . '登录绑定成功';
         } else {
             $ret['msg'] = 'what are you doing?';
         }
-        $res->throwJson($ret);
+        $this->responseJson($ret);
     }
 
     /** QQ空间Token算法*/
