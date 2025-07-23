@@ -5,7 +5,7 @@
  * @package XGLogin
  * @author zhi1499
  * @version 1.0.1
- * @link https://www.xggm.top
+ * @link https://kkang.iask.in
  */
 
 // 兼容 Typecho 1.2 版本
