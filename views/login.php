@@ -6,6 +6,8 @@ if ($user->hasLogin()) {
 $option = XGLogin_Plugin::getoptions();
 $rememberName = htmlspecialchars(Typecho_Cookie::get('__typecho_remember_name'));
 Typecho_Cookie::delete('__typecho_remember_name');
+// 兼容 Typecho 1.2 版本
+$suffixVersion = defined('TYPECHO_VERSION') ? TYPECHO_VERSION : '1.1';
 $header = '<link rel="stylesheet" href="' . Typecho_Common::url('normalize.css?v=' . $suffixVersion, $options->adminStaticUrl('css')) . '">
 <link rel="stylesheet" href="' . Typecho_Common::url('grid.css?v=' . $suffixVersion, $options->adminStaticUrl('css')) . '">
 <link rel="stylesheet" href="' . Typecho_Common::url('style.css?v=' . $suffixVersion, $options->adminStaticUrl('css')) . '">
@@ -25,21 +27,29 @@ $header = '<link rel="stylesheet" href="' . Typecho_Common::url('normalize.css?v
         <meta name="robots" content="noindex, nofollow">
       <?= $header;?>
       <?php 
-            $url = Helper::options()->pluginUrl . '/XGAdmin/static/';
-            $diycss = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->diycss;
-            $skin = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgfengge;
-            if ($skin == 'kongbai') {
-                $hed = $hed . '<style>' . $diycss . '</style>';
-            } else {
-                if ($skin == 'heike') {
-                    $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">';
-                } else {
-                    $bgUrl = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgUrl;
-                    $zidingyi = "";
-                    if ($bgUrl) {
-                        $zidingyi = "<style>body,body::before{background-image: url(" . $bgUrl . ")}</style>";
+            // 检查XGAdmin插件是否存在并可用
+            $hed = '';
+            if (Typecho_Plugin::exists('XGAdmin')) {
+                try {
+                    $url = Helper::options()->pluginUrl . '/XGAdmin/static/';
+                    $diycss = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->diycss;
+                    $skin = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgfengge;
+                    if ($skin == 'kongbai') {
+                        $hed = $hed . '<style>' . $diycss . '</style>';
+                    } else {
+                        if ($skin == 'heike') {
+                            $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">';
+                        } else {
+                            $bgUrl = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgUrl;
+                            $zidingyi = "";
+                            if ($bgUrl) {
+                                $zidingyi = "<style>body,body::before{background-image: url(" . $bgUrl . ")}</style>";
+                            }
+                            $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">' . $zidingyi;
+                        }
                     }
-                    $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">' . $zidingyi;
+                } catch (Exception $e) {
+                    // XGAdmin插件配置不可用，使用默认样式
                 }
             }
             echo $hed;
