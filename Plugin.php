@@ -8,6 +8,14 @@
  * @link https://www.xggm.top
  */
 
+// 兼容 Typecho 1.2 版本
+if (!defined('__TYPECHO_ROOT_DIR__')) {
+    exit;
+}
+
+// 移除所有Typecho核心类的兼容性代码
+// 直接使用Typecho 1.2+的原生类名
+
 class XGLogin_Plugin implements Typecho_Plugin_Interface
 {
     const PLUGIN_NAME = 'XGLogin';
@@ -23,10 +31,9 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-
         /** 判断插件是否可读写 */
         /** 数据保存也可用数据库，但感觉写起来略显复杂，因为懒.所以没写。*/
-        $randstr  = Typecho_Common::randString(32);
+        $randstr  = class_exists('Typecho\Common') ? \Typecho\Common::randString(32) : Typecho_Common::randString(32);
         $filepath = self::PLUGIN_PATH . $randstr . '.db';
         @file_put_contents($filepath, $randstr);
         if (!file_exists($filepath) || file_get_contents($filepath) != $randstr) {
@@ -35,9 +42,16 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
         @file_put_contents($filepath, self::authcode(serialize(array()), 'ENCODE', $randstr));
         // --------------------------
 
-        Typecho_Plugin::factory('admin/menu.php')->navBar    = array(__class__, 'render');
-        Typecho_Plugin::factory('admin/header.php')->header  = array(__class__, 'login');
-        Typecho_Plugin::factory('Widget_User')->loginSucceed = array(__class__, 'afterlogin');
+        // 兼容 Typecho 1.2 版本的钩子注册
+        if (class_exists('Typecho\Plugin')) {
+            \Typecho\Plugin::factory('admin/menu.php')->navBar = array(__class__, 'render');
+            \Typecho\Plugin::factory('admin/header.php')->header = array(__class__, 'login');
+            \Typecho\Plugin::factory('Widget_User')->loginSucceed = array(__class__, 'afterlogin');
+        } else {
+            Typecho_Plugin::factory('admin/menu.php')->navBar = array(__class__, 'render');
+            Typecho_Plugin::factory('admin/header.php')->header = array(__class__, 'login');
+            Typecho_Plugin::factory('Widget_User')->loginSucceed = array(__class__, 'afterlogin');
+        }
 
         Helper::addRoute('bind', __TYPECHO_ADMIN_DIR__ . 'XGLogin/bind', 'XGLogin_Action', 'bind');
         Helper::addRoute('login', __TYPECHO_ADMIN_DIR__ . 'XGLogin/login', 'XGLogin_Action', 'login');
@@ -45,7 +59,6 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
         Helper::addRoute('auth-bind', __TYPECHO_ADMIN_DIR__ . 'XGLogin/auth-bind', 'XGLogin_Action', 'authbind');
         Helper::addRoute('getqrcode', __TYPECHO_ADMIN_DIR__ . 'XGLogin/getqrcode', 'XGLogin_Action', 'getqrcode');
         Helper::addRoute('getresult', __TYPECHO_ADMIN_DIR__ . 'XGLogin/getresult', 'XGLogin_Action', 'getresult');
-
     }
 
     /**
@@ -81,7 +94,6 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
      */
     public static function config(Typecho_Widget_Helper_Form $form)
     {
-
         /** 取出数据文件及密匙 */
         $dirs = scandir(self::PLUGIN_PATH);
         foreach ($dirs as $dir) {
@@ -96,28 +108,33 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
         }
         if (!isset($key))
             throw new Typecho_Plugin_Exception('插件数据损坏，请重新启用插件！');
-        $data = XGLogin_Plugin::getuser();;
+        $data = XGLogin_Plugin::getuser();
 
-        $user = Typecho_Widget::widget('Widget_User');
+        // 兼容 Typecho 1.2 版本
+        $user = class_exists('Typecho\Widget') ? \Typecho\Widget::widget('Widget_User') : Typecho_Widget::widget('Widget_User');
 
-        $key = new Typecho_Widget_Helper_Form_Element_Text('key', null, $key, _t('数据加密密匙：'), _t('<b>插件使用本地文件保存授权数据，此密匙用来加解密数据，同时也是数据的文件名，启用时由系统随机生成，勿强行修改!</b>'));
-        $form->addInput($key);
+        // 兼容 Typecho 1.2 版本的表单元素
+        if (class_exists('Typecho\Widget\Helper\Form\Element\Text')) {
+            $keyElement = new \Typecho\Widget\Helper\Form\Element\Text('key', null, $key, _t('数据加密密匙：'), _t('<b>插件使用本地文件保存授权数据，此密匙用来加解密数据，同时也是数据的文件名，启用时由系统随机生成，勿强行修改!</b>'));
+            $typeElement = new \Typecho\Widget\Helper\Form\Element\Radio('type', array('0' => 'QQ扫码'), 0, _t('默认扫码方式：', ''));
+            $offElement = new \Typecho\Widget\Helper\Form\Element\Radio('off', array('0' => '开启', '1' => '关闭'), 0, _t('账户密码登录：', ''));
+            $usersElement = new \Typecho\Widget\Helper\Form\Element\Radio('users', array('0' => '否', '1' => '是'), 0, _t('非管理员启用：', ''));
+        } else {
+            $keyElement = new Typecho_Widget_Helper_Form_Element_Text('key', null, $key, _t('数据加密密匙：'), _t('<b>插件使用本地文件保存授权数据，此密匙用来加解密数据，同时也是数据的文件名，启用时由系统随机生成，勿强行修改!</b>'));
+            $typeElement = new Typecho_Widget_Helper_Form_Element_Radio('type', array('0' => 'QQ扫码'), 0, _t('默认扫码方式：', ''));
+            $offElement = new Typecho_Widget_Helper_Form_Element_Radio('off', array('0' => '开启', '1' => '关闭'), 0, _t('账户密码登录：', ''));
+            $usersElement = new Typecho_Widget_Helper_Form_Element_Radio('users', array('0' => '否', '1' => '是'), 0, _t('非管理员启用：', ''));
+        }
 
-        $type = new Typecho_Widget_Helper_Form_Element_Radio('type', array('0' => 'QQ扫码'), 0, _t('默认扫码方式：', ''));
-        $form->addInput($type);
-
-        $off = new Typecho_Widget_Helper_Form_Element_Radio('off', array('0' => '开启', '1' => '关闭'), 0, _t('账户密码登录：', ''));
-        $form->addInput($off);
-
-        $users = new Typecho_Widget_Helper_Form_Element_Radio('users', array('0' => '否', '1' => '是'), 0, _t('非管理员启用：', ''));
-        $form->addInput($users);
+        $form->addInput($keyElement);
+        $form->addInput($typeElement);
+        $form->addInput($offElement);
+        $form->addInput($usersElement);
 
         $username = $user->__get('name');
-
         $qq = $data[$username]['qq'];
 
         echo '<ul class="typecho-option"><li><label class="typecho-label">使用说明：</label><p class="description">本插件可取代后台默认的账户密码登录，无需申请官方接口，管理员账户之间互相独立；登录接口QQ空间登录，所以在绑定登录时会有相应的提示；此插件对QQ不会有任何影响，如果QQ提示异地登录，那是因为所在服务器使用了登录，同时本插件不会收集任何账户信息，如果不放心，请禁用删除；支持多用户，允许非管理人员使用，会在导航栏显示绑定按钮，同一QQ只能绑定一个账户。<br/><b><font color=red>默认开启账户密码登录，如需关闭，请先确保已经绑定QQ，否则将无法登录后台；如果您真的遇到这种情况，重装插件可以解决！</font></b></p></li></ul><ul class="typecho-option"><li><label class="typecho-label">绑定情况：</label>当前登录用户：' . $username . '&nbsp;&nbsp;QQ：<u>' . (empty($qq) ? '暂未绑定' : $qq) . '</u></li><li><a href="' . self::tourl('XGLogin/auth-bind') . '"><button type="submit" class="btn primary">绑定账号</button></a></li></ul>';
-
     }
 
     /**
@@ -151,10 +168,15 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
     public static function login($header)
     {
         /** 判断是否登录页面 */
-        $request = Typecho_Request::getInstance();
+        $request = class_exists('Typecho\Request') ? \Typecho\Request::getInstance() : Typecho_Request::getInstance();
         $pathinfo = $request->getPathinfo();
+        $requestUri = $request->getRequestUri();
         
-        if (strpos($pathinfo, __TYPECHO_ADMIN_DIR__ . 'login.php') !== false) {
+        // 兼容 Typecho 1.2 版本的登录页面检测
+        if (strpos($pathinfo, __TYPECHO_ADMIN_DIR__ . 'login.php') !== false || 
+            strpos($requestUri, __TYPECHO_ADMIN_DIR__ . 'login.php') !== false ||
+            strpos($requestUri, '/admin/login') !== false) {
+            
             // 检查是否有输出缓冲区
             if (ob_get_level() > 0) {
                 /** 清空输出缓存区 */
@@ -184,7 +206,12 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
     /** 生成URL，解决部分博客未开启伪静态，仅对本插件有效 */
     public static function tourl($action)
     {
-        return Typecho_Common::url(__TYPECHO_ADMIN_DIR__ . $action, Helper::options()->index);
+        // 兼容 Typecho 1.2 版本
+        if (class_exists('Typecho\Common')) {
+            return \Typecho\Common::url(__TYPECHO_ADMIN_DIR__ . $action, Helper::options()->index);
+        } else {
+            return Typecho_Common::url(__TYPECHO_ADMIN_DIR__ . $action, Helper::options()->index);
+        }
     }
 
     /** 获取插件配置 */
@@ -199,7 +226,7 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
         try {
             $options = Helper::options()->plugin(XGLogin_Plugin::PLUGIN_NAME);
             $key     = $options->key;
-        } catch (Typecho_Plugin_Exception $e) {
+        } catch (Exception $e) {
             $dirs = scandir(self::PLUGIN_PATH);
             foreach ($dirs as $dir) {
                 $path = self::PLUGIN_PATH . $dir;
