@@ -21,25 +21,34 @@ if($group != 'administrator' && !$option->users){ //非管理员且[非管理员
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>XGLogin - 扫描登录授权绑定</title>
         <meta name="robots" content="noindex, nofollow">
-        <link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/normalize.css?v=17.10.30">
-		<link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/grid.css?v=17.10.30">
-		<link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/style.css?v=17.10.30">
+        <?php $suffixVersion = defined('TYPECHO_VERSION') ? TYPECHO_VERSION : '17.10.30'; ?>
+        <link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/normalize.css?v=<?=$suffixVersion?>">
+		<link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/grid.css?v=<?=$suffixVersion?>">
+		<link rel="stylesheet" href="<?=__TYPECHO_ADMIN_DIR__?>css/style.css?v=<?=$suffixVersion?>">
 		<?php 
-            $url = Helper::options()->pluginUrl . '/XGAdmin/static/';
-            $diycss = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->diycss;
-            $skin = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgfengge;
-            if ($skin == 'kongbai') {
-                $hed = $hed . '<style>' . $diycss . '</style>';
-            } else {
-                if ($skin == 'heike') {
-                    $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">';
-                } else {
-                    $bgUrl = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgUrl;
-                    $zidingyi = "";
-                    if ($bgUrl) {
-                        $zidingyi = "<style>body,body::before{background-image: url(" . $bgUrl . ")}</style>";
+            // 检查XGAdmin插件是否存在并可用
+            $hed = '';
+            if (Typecho_Plugin::exists('XGAdmin')) {
+                try {
+                    $url = Helper::options()->pluginUrl . '/XGAdmin/static/';
+                    $diycss = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->diycss;
+                    $skin = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgfengge;
+                    if ($skin == 'kongbai') {
+                        $hed = $hed . '<style>' . $diycss . '</style>';
+                    } else {
+                        if ($skin == 'heike') {
+                            $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">';
+                        } else {
+                            $bgUrl = Typecho_Widget::widget('Widget_Options')->plugin('XGAdmin')->bgUrl;
+                            $zidingyi = "";
+                            if ($bgUrl) {
+                                $zidingyi = "<style>body,body::before{background-image: url(" . $bgUrl . ")}</style>";
+                            }
+                            $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">' . $zidingyi;
+                        }
                     }
-                    $hed = $hed . '<link rel="stylesheet" href="' . $url . 'skin/' . $skin . '.css?20220805">' . $zidingyi;
+                } catch (Exception $e) {
+                    // XGAdmin插件配置不可用，使用默认样式
                 }
             }
             echo $hed;
