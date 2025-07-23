@@ -3,8 +3,8 @@
  * 后台QQ扫码登录
  *
  * @package XGLogin
- * @author XGGM
- * @version 1.0.0
+ * @author zhi1499
+ * @version 1.0.1
  * @link https://www.xggm.top
  */
 
