@@ -134,30 +134,39 @@ class XGLogin_Plugin implements Typecho_Plugin_Interface
 
     public static function afterlogin($this_, $name, $password, $temporarily, $expire)
     {
-
         $options = self::getoptions();
         if ($options->off === '1') {
             echo 'what are you doing?';
             // 登录之前没有合适的插入点，这里强制退出
-            $this_->logout();
+            // 兼容 Typecho 1.2 版本
+            if (method_exists($this_, 'logout')) {
+                $this_->logout();
+            } else {
+                // 尝试使用 Widget_User 的 logout 方法
+                Typecho_Widget::widget('Widget_User')->logout();
+            }
         }
     }
 
     public static function login($header)
     {
-
-        /** 获取链接信息 */
-        $baseurl = Typecho_Request::getInstance()->getBaseUrl();
-
-        /** 判断是否登录 */
-        if ($baseurl == __TYPECHO_ADMIN_DIR__ . 'login.php') {
-
-            /** 清空输出缓存区 */
-            ob_clean();
+        /** 判断是否登录页面 */
+        $request = Typecho_Request::getInstance();
+        $pathinfo = $request->getPathinfo();
+        
+        if (strpos($pathinfo, __TYPECHO_ADMIN_DIR__ . 'login.php') !== false) {
+            // 检查是否有输出缓冲区
+            if (ob_get_level() > 0) {
+                /** 清空输出缓存区 */
+                ob_clean();
+            }
 
             require_once self::PLUGIN_PATH . 'views/login.php';
 
-            ob_end_flush();
+            // 检查是否有输出缓冲区
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
             exit();
         } else {
             return $header;
